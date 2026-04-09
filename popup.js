@@ -20,12 +20,26 @@ async function getCurrentSlug() {
   });
 }
 
-async function hasUserSolved(username, slug) {
-  if (!slug) return false;
+function getTodayStartTimestamp() {
+  const now = new Date();
+  const todayStart = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    0,
+    0,
+    0,
+    0
+  );
+  return Math.floor(todayStart.getTime() / 1000);
+}
+
+async function getUserSubmissionStats(username, slug) {
   const query = `
       query recentAcSubmissions($username: String!) {
         recentAcSubmissionList(username: $username) {
           titleSlug
+          timestamp
         }
       }
     `;
@@ -37,10 +51,20 @@ async function hasUserSolved(username, slug) {
     });
     const data = await res.json();
     const submissions = data.data?.recentAcSubmissionList || [];
-    return submissions.some((sub) => sub.titleSlug === slug);
+    const solved = slug
+      ? submissions.some((sub) => sub.titleSlug === slug)
+      : false;
+    const todayStartTimestamp = getTodayStartTimestamp();
+    const solvedToday = new Set(
+      submissions
+        .filter((sub) => parseInt(sub.timestamp, 10) >= todayStartTimestamp)
+        .map((sub) => sub.titleSlug)
+    );
+
+    return { solved, todayCount: solvedToday.size };
   } catch (err) {
     console.error(`❌ Error checking ${username}:`, err);
-    return false;
+    return { solved: false, todayCount: 0 };
   }
 }
 
@@ -58,12 +82,13 @@ document.addEventListener("DOMContentLoaded", async () => {
     list.appendChild(li);
 
     if (!slug) {
-      li.textContent = `${user} - ⚠️ No problem detected`;
+      const { todayCount } = await getUserSubmissionStats(user, slug);
+      li.textContent = `${user} - ⚠️ No problem detected | Today: ${todayCount}`;
       return;
     }
 
-    const solved = await hasUserSolved(user, slug);
-    li.textContent = `${user} - ${solved ? "Solved ✅" : "Not Solved ❌"}`;
+    const { solved, todayCount } = await getUserSubmissionStats(user, slug);
+    li.textContent = `${user} - ${solved ? "Solved ✅" : "Not Solved ❌"} | Today: ${todayCount}`;
   }
 
   function addUser() {
