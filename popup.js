@@ -5,11 +5,18 @@ async function getCurrentSlug() {
         alert("No active tab found.");
         return resolve("");
       }
+
+      const tabUrl = tabs[0].url || "";
+      const match = tabUrl.match(/leetcode\.com\/problems\/([^/?#]+)/);
+      if (match) {
+        return resolve(match[1]);
+      }
+
       chrome.tabs.sendMessage(tabs[0].id, { type: "getSlug" }, (res) => {
         if (chrome.runtime.lastError) {
           console.error(
-            "❌ Could not connect to content script:",
-            chrome.runtime.lastError
+            "Could not connect to content script:",
+            chrome.runtime.lastError.message
           );
           alert("Please open a LeetCode problem page before using this.");
           return resolve("");
